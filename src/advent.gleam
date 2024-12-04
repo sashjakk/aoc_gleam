@@ -41,3 +41,9 @@ pub fn read_lines(path: String) -> List(String) {
   })
   |> result.unwrap([])
 }
+
+pub fn read(path: String) -> String {
+  path
+  |> simplifile.read
+  |> result.unwrap("")
+}
