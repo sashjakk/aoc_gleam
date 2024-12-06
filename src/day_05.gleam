@@ -22,48 +22,39 @@ pub fn main() {
 fn part_1(content: List(String)) -> Int {
   let #(rules, manuals) = parse(content)
 
-  manuals
-  |> list.filter(valid(_, rules))
-  |> list.filter_map(fn(line) {
-    line
-    |> list.split(list.length(line) / 2)
-    |> pair.second
-    |> list.first
-  })
-  |> int.sum
+  use acc, manual <- list.fold(manuals, 0)
+  let sorted = list.sort(manual, sort_with(rules))
+  case manual == sorted {
+    False -> acc
+    True ->
+      {
+        sorted
+        |> list.split(list.length(sorted) / 2)
+        |> pair.second
+        |> list.first
+        |> result.unwrap(0)
+      }
+      + acc
+  }
 }
 
 fn part_2(content: List(String)) -> Int {
   let #(rules, manuals) = parse(content)
 
-  let sort_with = fn(rules: Dict(Int, Rule)) {
-    fn(a: Int, b: Int) {
-      case dict.get(rules, b) {
-        Error(_) -> order.Eq
-        Ok(Rule(before, _)) -> {
-          case list.contains(before, a) {
-            True -> order.Lt
-            False -> order.Gt
-          }
-        }
+  use acc, manual <- list.fold(manuals, 0)
+  let sorted = list.sort(manual, sort_with(rules))
+  case manual == sorted {
+    True -> acc
+    False ->
+      {
+        sorted
+        |> list.split(list.length(sorted) / 2)
+        |> pair.second
+        |> list.first
+        |> result.unwrap(0)
       }
-    }
+      + acc
   }
-
-  manuals
-  |> list.filter(fn(it) { valid(it, rules) |> bool.negate })
-  |> list.map(list.sort(_, sort_with(rules)))
-  |> list.filter_map(fn(line) {
-    line
-    |> list.split(list.length(line) / 2)
-    |> pair.second
-    |> list.first
-  })
-  |> int.sum
-}
-
-type Rule {
-  Rule(before: List(Int), after: List(Int))
 }
 
 fn parse(content: List(String)) {
@@ -80,21 +71,13 @@ fn parse(content: List(String)) {
       |> list.filter_map(int.parse)
 
     case numbers {
-      [a, b] -> {
-        acc
-        |> dict.upsert(a, fn(existing) {
+      [a, b] ->
+        dict.upsert(acc, a, fn(existing) {
           case existing {
-            Some(rule) -> Rule(..rule, after: [b, ..rule.after])
-            None -> Rule(before: [], after: [b])
+            Some(values) -> [b, ..values]
+            None -> [b]
           }
         })
-        |> dict.upsert(b, fn(existing) {
-          case existing {
-            Some(rule) -> Rule(..rule, before: [a, ..rule.before])
-            None -> Rule(before: [a], after: [])
-          }
-        })
-      }
       _ -> acc
     }
   }
@@ -109,31 +92,24 @@ fn parse(content: List(String)) {
   #(rules, manuals)
 }
 
-fn valid(line: List(Int), rules: Dict(Int, Rule)) -> Bool {
-  let range = list.range(1, list.length(line) - 1)
-  use index <- list.all(range)
-
-  let #(raw, right) = list.split(line, index)
-  let left = list.take(raw, index - 1)
-
-  {
-    use key <- result.try(
-      raw
-      |> list.last
-      |> result.map_error(fn(_) { False }),
+fn sort_with(rules: Dict(Int, List(Int))) {
+  fn(a, b) {
+    use <- bool.guard(
+      when: rules
+        |> dict.get(b)
+        |> result.map(list.contains(_, a))
+        |> result.unwrap(False),
+      return: order.Gt,
     )
 
-    use Rule(before, after) <- result.try(
-      rules
-      |> dict.get(key)
-      |> result.map_error(fn(_) { False }),
+    use <- bool.guard(
+      when: rules
+        |> dict.get(a)
+        |> result.map(list.contains(_, b))
+        |> result.unwrap(False),
+      return: order.Lt,
     )
 
-    {
-      list.all(left, list.contains(before, _))
-      && list.all(right, list.contains(after, _))
-    }
-    |> Ok
+    order.Eq
   }
-  |> result.unwrap(False)
 }
